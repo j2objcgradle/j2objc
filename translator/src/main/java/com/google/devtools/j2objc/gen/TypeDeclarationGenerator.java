@@ -44,7 +44,6 @@ import com.google.devtools.j2objc.util.UnicodeUtils;
 import com.google.j2objc.annotations.Property;
 import java.lang.reflect.Modifier;
 import java.util.*;
-import java.util.logging.Logger;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.TypeParameterElement;
@@ -60,10 +59,7 @@ import javax.lang.model.type.TypeMirror;
 public class TypeDeclarationGenerator extends TypeGenerator {
 
   private static final String DEPRECATED_ATTRIBUTE = "__attribute__((deprecated))";
-
-
-  private static final Logger logger = Logger.getLogger(TypeDeclarationGenerator.class.getName());
-
+  
   protected TypeDeclarationGenerator(SourceBuilder builder, AbstractTypeDeclaration node) {
     super(builder, node);
   }
@@ -94,9 +90,6 @@ public class TypeDeclarationGenerator extends TypeGenerator {
 
   protected void generateInitialDeclaration() {
     printNativeEnum();
-
-    if(typeName.contains("ThreadLocal"))
-      logger.severe(typeName);
 
     printTypeDocumentation();
     if (typeElement.getKind().isInterface()) {
