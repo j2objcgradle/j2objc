@@ -15,6 +15,7 @@
 package com.google.devtools.j2objc.gen;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
@@ -42,13 +43,11 @@ import com.google.devtools.j2objc.util.TypeUtil;
 import com.google.devtools.j2objc.util.UnicodeUtils;
 import com.google.j2objc.annotations.Property;
 import java.lang.reflect.Modifier;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.logging.Logger;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.PrimitiveType;
 import javax.lang.model.type.TypeMirror;
@@ -61,6 +60,9 @@ import javax.lang.model.type.TypeMirror;
 public class TypeDeclarationGenerator extends TypeGenerator {
 
   private static final String DEPRECATED_ATTRIBUTE = "__attribute__((deprecated))";
+
+
+  private static final Logger logger = Logger.getLogger(TypeDeclarationGenerator.class.getName());
 
   protected TypeDeclarationGenerator(SourceBuilder builder, AbstractTypeDeclaration node) {
     super(builder, node);
@@ -93,13 +95,21 @@ public class TypeDeclarationGenerator extends TypeGenerator {
   protected void generateInitialDeclaration() {
     printNativeEnum();
 
+    if(typeName.contains("ThreadLocal"))
+      logger.severe(typeName);
+
     printTypeDocumentation();
     if (typeElement.getKind().isInterface()) {
       printf("@protocol %s", typeName);
     } else {
-      printf("@interface %s : %s", typeName, getSuperTypeName());
+      printf("@interface %s", typeName, getSuperTypeName());
+
+      print(typeElement.getTypeParameters().isEmpty() ? "" : "<" + Joiner.on(", ").join(typeElement.getTypeParameters()) + ">");
+      printf(": %s", getSuperTypeName());
     }
+
     printImplementedProtocols();
+
     if (!typeElement.getKind().isInterface()) {
       printInstanceVariables();
     } else {
@@ -379,7 +389,9 @@ public class TypeDeclarationGenerator extends TypeGenerator {
           print(") ");
         }
 
-        String objcType = nameTable.getObjCType(varType);
+        ArrayList<TypeMirror> genericTypes = new ArrayList<>();
+        typeElement.getTypeParameters().forEach((typeParameterElement -> genericTypes.add(typeParameterElement.asType())));
+        String objcType = nameTable.getObjCType(varType, genericTypes);
         print(objcType);
         if (!objcType.endsWith("*")) {
           print(' ');
@@ -597,7 +609,18 @@ public class TypeDeclarationGenerator extends TypeGenerator {
 
     newline();
     JavadocGenerator.printDocComment(getBuilder(), m.getJavadoc());
-    print(getMethodSignature(m));
+
+    if(!typeElement.getKind().isInterface())
+    {
+      ArrayList<TypeMirror> genericTypes = new ArrayList<>();
+      typeElement.getTypeParameters().forEach((typeParameterElement -> genericTypes.add(typeParameterElement.asType())));
+      print(getMethodSignature(m, genericTypes));
+    }
+    else
+    {
+      print(getMethodSignature(m, null));
+    }
+
     String methodName = nameTable.getMethodSelector(methodElement);
     if (!m.isConstructor() && NameTable.needsObjcMethodFamilyNoneAttribute(methodName)) {
       // Getting around a clang warning.

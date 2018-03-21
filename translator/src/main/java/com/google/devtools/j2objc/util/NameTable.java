@@ -38,12 +38,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
-import javax.lang.model.element.AnnotationMirror;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.PackageElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.ArrayType;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 
 /**
@@ -525,15 +523,22 @@ public class NameTable {
   }
 
   /**
-   * Convert a Java type to an equivalent Objective-C type with type variables
-   * resolved to their bounds.
+   * Convert a Java type to an equivalent Objective-C type
    */
+  public String getObjCType(TypeMirror type, List<TypeMirror> availableGenerics) {
+    return getObjcTypeInner(type, null, availableGenerics);
+  }
+
+  public String getObjCType(VariableElement var, List<TypeMirror> availableGenerics) {
+    return getObjcTypeInner(var.asType(), ElementUtil.getTypeQualifiers(var), availableGenerics);
+  }
+
   public String getObjCType(TypeMirror type) {
-    return getObjcTypeInner(type, null);
+    return getObjCType(type, null);
   }
 
   public String getObjCType(VariableElement var) {
-    return getObjcTypeInner(var.asType(), ElementUtil.getTypeQualifiers(var));
+    return getObjCType(var, null);
   }
 
   /**
@@ -552,8 +557,9 @@ public class NameTable {
     return "jobject";
   }
 
-  private String getObjcTypeInner(TypeMirror type, String qualifiers) {
+  private String getObjcTypeInner(TypeMirror type, String qualifiers, List<TypeMirror> availableGenericTypes) {
     String objcType;
+
     if (type instanceof NativeType) {
       objcType = ((NativeType) type).getName();
     } else if (type instanceof PointerType) {
@@ -565,12 +571,14 @@ public class NameTable {
           qualifiers = qualifiers.substring(idx + 1);
         }
       }
-      objcType = getObjcTypeInner(((PointerType) type).getPointeeType(), pointeeQualifiers);
+      objcType = getObjcTypeInner(((PointerType) type).getPointeeType(), pointeeQualifiers, availableGenericTypes);
       objcType = objcType.endsWith("*") ? objcType + "*" : objcType + " *";
     } else if (TypeUtil.isPrimitiveOrVoid(type)) {
       objcType = getPrimitiveObjCType(type);
-    } else {
-      objcType = constructObjcTypeFromBounds(type);
+    } else if (type.getKind() == TypeKind.TYPEVAR && availableGenericTypes != null && availableGenericTypes.contains(type)){
+      objcType = type.toString();
+    }else {
+      objcType = constructObjcTypeFromBounds(type, availableGenericTypes);
     }
     if (qualifiers != null) {
       qualifiers = qualifiers.trim();
@@ -581,7 +589,7 @@ public class NameTable {
     return objcType;
   }
 
-  private String constructObjcTypeFromBounds(TypeMirror type) {
+  private String constructObjcTypeFromBounds(TypeMirror type, List<TypeMirror> availableGenerics) {
     String classType = null;
     List<String> interfaces = new ArrayList<>();
     for (TypeElement bound : typeUtil.getObjcUpperBounds(type)) {
@@ -592,6 +600,20 @@ public class NameTable {
         classType = getFullName(bound);
       }
     }
+
+    if(interfaces.isEmpty()
+        && TypeUtil.isDeclaredType(type))
+    {
+      DeclaredType declaredType = (DeclaredType) type;
+      declaredType.getTypeArguments().forEach(typeMirror -> {
+        if(typeMirror.getKind() == TypeKind.TYPEVAR
+                && availableGenerics != null
+                && availableGenerics.contains(typeMirror)) {
+          interfaces.add(typeMirror.toString());
+        }
+      });
+    }
+
     String protocols = interfaces.isEmpty() ? "" : "<" + Joiner.on(", ").join(interfaces) + ">";
     return classType == null ? ID_TYPE + protocols : classType + protocols + " *";
   }

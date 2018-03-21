@@ -17,6 +17,7 @@ package com.google.devtools.j2objc.gen;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.reflect.TypeParameter;
 import com.google.devtools.j2objc.Options;
 import com.google.devtools.j2objc.ast.AbstractTypeDeclaration;
 import com.google.devtools.j2objc.ast.BodyDeclaration;
@@ -38,10 +39,7 @@ import com.google.devtools.j2objc.util.UnicodeUtils;
 import java.lang.reflect.Modifier;
 import java.util.Iterator;
 import java.util.List;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
 
 /**
@@ -276,11 +274,11 @@ public abstract class TypeGenerator extends AbstractSourceGenerator {
   /**
    * Create an Objective-C method signature string.
    */
-  protected String getMethodSignature(MethodDeclaration m) {
+  protected String getMethodSignature(MethodDeclaration m, List<TypeMirror> typeParameters) {
     StringBuilder sb = new StringBuilder();
     ExecutableElement element = m.getExecutableElement();
     char prefix = Modifier.isStatic(m.getModifiers()) ? '+' : '-';
-    String returnType = nameTable.getObjCType(element.getReturnType());
+    String returnType = nameTable.getObjCType(element.getReturnType(),typeParameters);
     String selector = nameTable.getMethodSelector(element);
     if (m.isConstructor()) {
       returnType = "instancetype";
@@ -305,7 +303,7 @@ public abstract class TypeGenerator extends AbstractSourceGenerator {
           sb.append(pad(baseLength - selParts[i].length()));
         }
         VariableElement var = params.get(i).getVariableElement();
-        String typeName = nameTable.getObjCType(var.asType());
+        String typeName = nameTable.getObjCType(var.asType(), typeParameters);
         sb.append(UnicodeUtils.format("%s:(%s%s)%s", selParts[i], typeName, nullability(var),
             nameTable.getVariableShortName(var)));
       }

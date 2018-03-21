@@ -14,12 +14,15 @@
 
 package com.google.devtools.j2objc.gen;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
 import com.google.devtools.j2objc.ast.AbstractTypeDeclaration;
 import com.google.devtools.j2objc.ast.BodyDeclaration;
 import com.google.devtools.j2objc.ast.Expression;
 import com.google.devtools.j2objc.ast.FunctionDeclaration;
 import com.google.devtools.j2objc.ast.VariableDeclarationFragment;
+
+import javax.lang.model.element.TypeParameterElement;
 import java.lang.reflect.Modifier;
 
 /**
@@ -66,7 +69,10 @@ public class TypePrivateDeclarationGenerator extends TypeDeclarationGenerator {
     Iterable<BodyDeclaration> privateDecls = getInnerDeclarations();
     if (!Iterables.isEmpty(privateDecls) || hasPrivateFields) {
       newline();
-      printf("@interface %s ()", typeName);
+      printf("@interface %s", typeName);
+
+      print(typeElement.getTypeParameters().isEmpty() ? "" : "<" + Joiner.on(", ").join(typeElement.getTypeParameters()) + ">");
+      print("()");
       printInstanceVariables();
       printDeclarations(privateDecls);
       println("\n@end");
